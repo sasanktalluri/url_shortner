@@ -51,6 +51,17 @@ whatever's in `.env` automatically either way).
 Full list of env vars the app reads (see `src/main/resources/application.yml`): `DB_HOST`,
 `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `APP_BASE_URL`, `SERVER_PORT`.
 
+## Testing scripts (run against the live app)
+
+```bash
+./scripts/api-smoke-test.sh              # every API combination: alias/no alias/duplicate
+                                          # alias/invalid input/expiry/redirect/stats - 12 checks
+BASE_URL=http://localhost:8080 \
+  ./scripts/load-test.sh [CONCURRENCY] [TOTAL]   # curl-based load test, defaults 20/200
+```
+See [Testing approach](05-testing-approach.md#load-testing) for what each covers and a real bug
+`load-test.sh` found (connection-pool exhaustion under concurrent redirects).
+
 ## Quality gates (optional, for reviewing the codebase itself)
 
 ```bash

@@ -6,7 +6,6 @@ import com.schwab.urlshortener.exception.UrlNotFoundException;
 import com.schwab.urlshortener.repository.ShortUrlRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 
@@ -27,7 +26,6 @@ public class RedirectService {
         this.clock = clock;
     }
 
-    @Transactional(readOnly = true)
     public String resolve(String shortCode) {
         ShortUrl shortUrl = repository.findByShortCode(shortCode)
                 .orElseThrow(() -> new UrlNotFoundException(shortCode));

@@ -26,6 +26,11 @@ repeatedly, across the life of this project — not inferred from tests passing.
   a fix — see [Architecture overview](02-architecture-overview.md)).
 - `scripts/run.sh` run from a cold `docker compose down` — confirmed the one-command setup path
   works, not just the manual multi-step version.
+- `scripts/api-smoke-test.sh` (12 checks across every API combination) and `scripts/load-test.sh`
+  both run against the live app — the load test found a real connection-pool exhaustion bug under
+  20-way concurrent redirects (`500`s after ~30s HikariCP timeouts), which got fixed and then
+  re-verified: 0 failures at 20 concurrent, still 0 at 40. Full detail:
+  [Testing approach](05-testing-approach.md#load-testing).
 - `mvn verify` (tests + jacoco + PMD + SpotBugs) passes clean end-to-end — see
   [Testing approach](05-testing-approach.md) for what each check actually covers.
 - `mvn org.owasp:dependency-check-maven:check` is configured and was launched against this

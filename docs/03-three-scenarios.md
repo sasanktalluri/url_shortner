@@ -52,10 +52,10 @@ last-accessed timestamp per short URL, exposed via a stats endpoint.
 is validated by it being documented as a known limitation rather than silently under-delivered —
 see [Testing approach](05-testing-approach.md#limitations-and-trade-offs).
 
-## Two more scenarios that emerged from actually running the app
+## More scenarios that emerged from actually running (and load-testing) the app
 
-Not originally planned as "scenarios," but worth recording the same way — both were only found by
-building and running the app end-to-end, not by compiling or unit testing:
+Not originally planned as "scenarios," but worth recording the same way — all three were only
+found by building, running, and load-testing the app for real, not by compiling or unit testing:
 
 - **Spring Boot 4 moved Flyway autoconfiguration into its own module** (`spring-boot-flyway`) -
   having `flyway-core` and `flyway-database-postgresql` on the classpath was not sufficient; the
@@ -68,5 +68,14 @@ building and running the app end-to-end, not by compiling or unit testing:
   looking for a no-arg constructor, found none, and threw `NoSuchMethodException`. Fixed by adding
   `@Autowired` to the intended constructor in both classes — and the same pattern was caught again
   in `SqidsShortCodeGenerator` before it shipped, by deliberately checking for it this time.
+- **Concurrent redirects exhausted the connection pool.** `./scripts/load-test.sh 20 200` found
+  23/200 concurrent redirects failing with `500` after ~30s each — a real HikariCP connection
+  timeout, not a flaky test. `RedirectService.resolve()`'s `@Transactional(readOnly = true)` held
+  one connection for the whole method while the `REQUIRES_NEW` click-count write needed a second
+  from the same pool, so every redirect briefly needed 2 connections at once and the default pool
+  of 10 saturated at 5 truly concurrent redirects. Fixed by removing the outer `@Transactional`
+  from `resolve()` — it wasn't load-bearing there, since the repository read and the write each
+  already had their own transaction. Re-ran the same load test after the fix: 0 failures at 20
+  concurrent, still 0 at 40. Full detail: [Testing approach](05-testing-approach.md#load-testing).
 
 See [Working prototype](01-working-prototype.md) for the full validation trail these came from.
