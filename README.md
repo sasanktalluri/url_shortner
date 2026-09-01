@@ -1,6 +1,9 @@
 # URL Shortener
 
-A Spring Boot URL shortener with create/redirect APIs, click analytics, and short-code generation
+Turns a long URL into a short one, like bit.ly — you POST a URL and get back a short code; anyone
+who visits it gets redirected to the original.
+
+A Spring Boot implementation with create/redirect APIs, click analytics, and short-code generation
 built as a Strategy pattern — the Schwab "AI-Assisted Software Engineering System" interview
 assignment (`docs/010 - Assignment - AI-Proficient Software Engineer.pdf`).
 
