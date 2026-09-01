@@ -29,6 +29,12 @@ public class ShortUrl {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "click_count", nullable = false)
+    private long clickCount = 0;
+
+    @Column(name = "last_accessed_at")
+    private Instant lastAccessedAt;
+
     protected ShortUrl() {}
 
     public ShortUrl(String shortCode, String originalUrl, Instant createdAt, Instant expiresAt) {
@@ -37,6 +43,7 @@ public class ShortUrl {
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
         this.active = true;
+        this.clickCount = 0;
     }
 
     public Long getId() { return id; }
@@ -45,4 +52,6 @@ public class ShortUrl {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
     public boolean isActive() { return active; }
+    public long getClickCount() { return clickCount; }
+    public Instant getLastAccessedAt() { return lastAccessedAt; }
 }

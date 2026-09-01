@@ -2,6 +2,7 @@ package com.schwab.urlshortener.controller;
 
 import com.schwab.urlshortener.dto.CreateUrlRequest;
 import com.schwab.urlshortener.dto.CreateUrlResponse;
+import com.schwab.urlshortener.dto.UrlStatsResponse;
 import com.schwab.urlshortener.service.UrlService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,5 +21,10 @@ public class UrlController {
     @PostMapping
     public ResponseEntity<CreateUrlResponse> create(@Valid @RequestBody CreateUrlRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(urlService.create(request));
+    }
+
+    @GetMapping("/{shortCode}/stats")
+    public ResponseEntity<UrlStatsResponse> stats(@PathVariable String shortCode) {
+        return ResponseEntity.ok(urlService.getStats(shortCode));
     }
 }

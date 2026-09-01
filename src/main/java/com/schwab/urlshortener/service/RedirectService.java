@@ -13,15 +13,17 @@ import java.time.Clock;
 @Service
 public class RedirectService {
     private final ShortUrlRepository repository;
+    private final ShortUrlWriter writer;
     private final Clock clock;
 
     @Autowired
-    public RedirectService(ShortUrlRepository repository) {
-        this(repository, Clock.systemUTC());
+    public RedirectService(ShortUrlRepository repository, ShortUrlWriter writer) {
+        this(repository, writer, Clock.systemUTC());
     }
 
-    RedirectService(ShortUrlRepository repository, Clock clock) {
+    RedirectService(ShortUrlRepository repository, ShortUrlWriter writer, Clock clock) {
         this.repository = repository;
+        this.writer = writer;
         this.clock = clock;
     }
 
@@ -38,6 +40,7 @@ public class RedirectService {
             throw new UrlExpiredException(shortCode);
         }
 
+        writer.incrementClickCount(shortCode, clock.instant());
         return shortUrl.getOriginalUrl();
     }
 }
