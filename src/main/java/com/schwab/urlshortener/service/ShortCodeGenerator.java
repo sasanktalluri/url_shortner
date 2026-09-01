@@ -13,6 +13,7 @@ import java.time.Instant;
  * still clash with a pre-existing custom alias, since aliases and generated codes share one
  * uniqueness namespace.
  */
+@FunctionalInterface
 public interface ShortCodeGenerator {
     ShortUrl createShortUrl(String originalUrl, Instant now, Instant expiresAt);
 }

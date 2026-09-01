@@ -82,7 +82,7 @@ public class UrlService {
         try {
             return writer.save(request.customAlias(), request.url(), now, request.expiresAt());
         } catch (DataIntegrityViolationException e) {
-            throw new AliasAlreadyExistsException(request.customAlias());
+            throw new AliasAlreadyExistsException(request.customAlias(), e);
         }
     }
 
