@@ -18,4 +18,9 @@ public interface ShortUrlRepository extends JpaRepository<ShortUrl, Long> {
 
     @Query(value = "SELECT nextval('short_code_seq')", nativeQuery = true)
     long nextShortCodeSequenceValue();
+
+
+    @Modifying
+    @Query("update ShortUrl s set s.active = false where s.shortCode = :shortCode")
+    int deactivate(@Param("shortCode") String shortCode);
 }

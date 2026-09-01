@@ -31,4 +31,9 @@ class ShortUrlWriter {
     void incrementClickCount(String shortCode, Instant accessedAt) {
         repository.incrementClickCount(shortCode, accessedAt);
     }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    int deactivate(String shortCode) {
+        return repository.deactivate(shortCode);
+    }
 }

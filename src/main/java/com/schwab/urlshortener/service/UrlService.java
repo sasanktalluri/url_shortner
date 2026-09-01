@@ -78,6 +78,13 @@ public class UrlService {
                 shortUrl.getLastAccessedAt());
     }
 
+    public void deactivate(String shortCode) {
+        int updated = writer.deactivate(shortCode);
+        if (updated == 0) {
+            throw new UrlNotFoundException(shortCode);
+        }
+    }
+
     private ShortUrl saveWithCustomAlias(CreateUrlRequest request, Instant now) {
         try {
             return writer.save(request.customAlias(), request.url(), now, request.expiresAt());

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -101,6 +100,37 @@ class UrlShortenerIntegrationTest {
     @Test
     void returnsNotFoundForUnknownShortCode() {
         client.get().uri("/does-not-exist")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @Test
+    void deactivateMakesTheCodeUnreachableAndIsIdempotent() {
+        CreateUrlRequest request = new CreateUrlRequest("https://example.com/to-deactivate", null, null);
+        CreateUrlResponse created = client.post().uri("/api/v1/urls")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectBody(CreateUrlResponse.class)
+                .returnResult()
+                .getResponseBody();
+        String shortCode = created.shortCode();
+
+        client.delete().uri("/api/v1/urls/" + shortCode)
+                .exchange()
+                .expectStatus().isEqualTo(204);
+
+        // Idempotent: deactivating again still succeeds.
+        client.delete().uri("/api/v1/urls/" + shortCode)
+                .exchange()
+                .expectStatus().isEqualTo(204);
+
+        client.get().uri("/" + shortCode)
+                .exchange()
+                .expectStatus().isNotFound();
+
+        client.delete().uri("/api/v1/urls/does-not-exist")
                 .exchange()
                 .expectStatus().isNotFound();
     }
