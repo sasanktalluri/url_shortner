@@ -48,10 +48,9 @@ class UrlServiceTest {
     }
 
     @Test
-    void createsUrlWithGeneratedCodeWhenNoAliasGiven() {
+    void createsUrlViaGeneratorWhenNoAliasGiven() {
         CreateUrlRequest request = new CreateUrlRequest("https://example.com", null, null);
-        when(generator.generate()).thenReturn("abc1234");
-        when(writer.save("abc1234", "https://example.com", NOW, null))
+        when(generator.createShortUrl("https://example.com", NOW, null))
                 .thenReturn(new ShortUrl("abc1234", "https://example.com", NOW, null));
 
         CreateUrlResponse response = service.create(request);
@@ -59,6 +58,7 @@ class UrlServiceTest {
         assertThat(response.shortCode()).isEqualTo("abc1234");
         assertThat(response.shortUrl()).isEqualTo("http://short.ly/abc1234");
         verify(validator).validate("https://example.com");
+        verifyNoInteractions(writer);
     }
 
     @Test
@@ -81,21 +81,6 @@ class UrlServiceTest {
 
         assertThatThrownBy(() -> service.create(request))
                 .isInstanceOf(AliasAlreadyExistsException.class);
-    }
-
-    @Test
-    void retriesGenerationOnCollisionAndSucceeds() {
-        CreateUrlRequest request = new CreateUrlRequest("https://example.com", null, null);
-        when(generator.generate()).thenReturn("dup0001", "fresh01");
-        when(writer.save(eq("dup0001"), anyString(), any(), any()))
-                .thenThrow(new DataIntegrityViolationException("unique violation"));
-        when(writer.save(eq("fresh01"), anyString(), any(), any()))
-                .thenReturn(new ShortUrl("fresh01", "https://example.com", NOW, null));
-
-        CreateUrlResponse response = service.create(request);
-
-        assertThat(response.shortCode()).isEqualTo("fresh01");
-        verify(writer, times(2)).save(anyString(), anyString(), any(), any());
     }
 
     @Test

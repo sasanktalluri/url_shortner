@@ -8,6 +8,7 @@ import com.schwab.urlshortener.exception.AliasAlreadyExistsException;
 import com.schwab.urlshortener.exception.UrlNotFoundException;
 import com.schwab.urlshortener.repository.ShortUrlRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -17,8 +18,6 @@ import java.time.Instant;
 
 @Service
 public class UrlService {
-    private static final int MAX_GENERATION_ATTEMPTS = 5;
-
     private final ShortUrlRepository repository;
     private final ShortUrlWriter writer;
     private final ShortCodeGenerator generator;
@@ -30,7 +29,7 @@ public class UrlService {
     public UrlService(
             ShortUrlRepository repository,
             ShortUrlWriter writer,
-            ShortCodeGenerator generator,
+            @Qualifier("sqids") ShortCodeGenerator generator,
             UrlValidator validator,
             @Value("${app.base-url:http://localhost:8080}") String baseUrl) {
         this(repository, writer, generator, validator, Clock.systemUTC(), baseUrl);
@@ -58,20 +57,11 @@ public class UrlService {
             throw new IllegalArgumentException("expiresAt must be in the future");
         }
 
-        if (request.customAlias() != null && !request.customAlias().isBlank()) {
-            return save(request, request.customAlias(), now, true);
-        }
+        ShortUrl saved = request.customAlias() != null && !request.customAlias().isBlank()
+                ? saveWithCustomAlias(request, now)
+                : generator.createShortUrl(request.url(), now, request.expiresAt());
 
-        for (int attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
-            try {
-                return save(request, generator.generate(), now, false);
-            } catch (DataIntegrityViolationException collision) {
-                if (attempt == MAX_GENERATION_ATTEMPTS) {
-                    throw collision;
-                }
-            }
-        }
-        throw new IllegalStateException("Unable to generate a unique short code");
+        return toResponse(saved);
     }
 
     public UrlStatsResponse getStats(String shortCode) {
@@ -88,21 +78,20 @@ public class UrlService {
                 shortUrl.getLastAccessedAt());
     }
 
-    private CreateUrlResponse save(CreateUrlRequest request, String shortCode, Instant now, boolean customAlias) {
+    private ShortUrl saveWithCustomAlias(CreateUrlRequest request, Instant now) {
         try {
-            ShortUrl saved = writer.save(shortCode, request.url(), now, request.expiresAt());
-
-            return new CreateUrlResponse(
-                    saved.getShortCode(),
-                    baseUrl + "/" + saved.getShortCode(),
-                    saved.getOriginalUrl(),
-                    saved.getCreatedAt(),
-                    saved.getExpiresAt());
+            return writer.save(request.customAlias(), request.url(), now, request.expiresAt());
         } catch (DataIntegrityViolationException e) {
-            if (customAlias) {
-                throw new AliasAlreadyExistsException(shortCode);
-            }
-            throw e;
+            throw new AliasAlreadyExistsException(request.customAlias());
         }
+    }
+
+    private CreateUrlResponse toResponse(ShortUrl saved) {
+        return new CreateUrlResponse(
+                saved.getShortCode(),
+                baseUrl + "/" + saved.getShortCode(),
+                saved.getOriginalUrl(),
+                saved.getCreatedAt(),
+                saved.getExpiresAt());
     }
 }
