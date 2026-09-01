@@ -7,6 +7,7 @@
 ```bash
 ./scripts/run.sh
 ```
+
 Starts Postgres via `docker compose`, waits for it to be healthy, then runs the app (Flyway
 migrations apply automatically on startup).
 
@@ -30,12 +31,22 @@ curl localhost:8080/api/v1/urls/UdBdLWZ/stats        # click count / last access
 ```
 
 Interactive API docs (Swagger UI, generated from the controllers — see
-[Architecture overview](02-architecture-overview.md)) are at `http://localhost:8080/swagger-ui/index.html`
-once the app is running; the raw OpenAPI 3.1 document is at `http://localhost:8080/v3/api-docs`.
+[Architecture overview](02-architecture-overview.md)) are at
+`http://localhost:8080/swagger-ui/index.html` once the app is running; the raw OpenAPI 3.1
+document is at `http://localhost:8080/v3/api-docs`.
+
+A point-in-time snapshot of that document is checked in at [`docs/openapi.json`](openapi.json),
+for browsing the full request/response contract without running the app. It's generated, not
+hand-maintained, so it can drift from the live spec — regenerate it with:
+
+```bash
+curl -s localhost:8080/v3/api-docs | python3 -m json.tool > docs/openapi.json
+```
 
 ## Configuration
 
 `.env` (git-ignored, at the repo root) needs:
+
 ```
 DB_NAME=urlshortener
 DB_USER=app_user
@@ -59,7 +70,8 @@ Full list of env vars the app reads (see `src/main/resources/application.yml`): 
 BASE_URL=http://localhost:8080 \
   ./scripts/load-test.sh [CONCURRENCY] [TOTAL]   # curl-based load test, defaults 20/200
 ```
-See [Testing approach](05-testing-approach.md#load-testing) for what each covers and a real bug
+
+See [Testing approach](05-testing-approach.md#load-testing) for what each covers, and a real bug
 `load-test.sh` found (connection-pool exhaustion under concurrent redirects).
 
 ## Troubleshooting
@@ -67,37 +79,42 @@ See [Testing approach](05-testing-approach.md#load-testing) for what each covers
 Every entry here is a real problem hit and fixed while building this project, not a hypothetical.
 
 **"Port 5432 was already in use"**
+
 Another local Postgres is already listening on the default port. Set a different `DB_PORT` in
 `.env` (`docker-compose.yml` reads it for the container's published port too) and re-run
 `./scripts/run.sh`, or pass it inline: `DB_PORT=5433 mvn spring-boot:run`.
 
 **"Web server failed to start. Port 8080 was already in use"**
+
 An earlier `mvn spring-boot:run` is still running from a previous session. Find and stop it:
+
 ```bash
 pkill -f "spring-boot:run"
+
 # or, if that doesn't catch it:
 lsof -iTCP:8080 -sTCP:LISTEN -n -P
 kill <PID from the output above>
 ```
 
-**Docker Desktop is running, but Testcontainers (the integration test, or `load-test.sh`) can't
-find it — `Could not find a valid Docker environment`, even though `docker info`/`docker ps` work
-fine from the shell**
+**Testcontainers can't find Docker, even though `docker info`/`docker ps` work from the shell**
+
 Docker Desktop's active context isn't always at the socket path Testcontainers checks by default.
 Point it explicitly at the real one:
+
 ```bash
 docker context ls                       # find the "DOCKER ENDPOINT" for your active (*) context
 export DOCKER_HOST="unix:///path/from/above/docker.sock"
 mvn test
 ```
 
-**Testcontainers itself fails with a malformed/empty response from Docker, even with `DOCKER_HOST`
-set correctly**
+**Testcontainers fails with a malformed/empty response from Docker, even with `DOCKER_HOST` set**
+
 A pinned Testcontainers version can be incompatible with a newer Docker Desktop release. This
 project already pins `1.21.4` in `pom.xml` for exactly this reason (`1.21.3` didn't work here) —
 if it recurs on a different machine, try bumping `testcontainers.version` further.
 
 **`mvn spring-boot:run` seems stuck / a terminal won't return control**
+
 `Ctrl+C` to cancel it. If that doesn't work, `pkill -f "spring-boot:run"` from another terminal.
 
 ## Quality gates (optional, for reviewing the codebase itself)
@@ -109,4 +126,5 @@ mvn org.owasp:dependency-check-maven:check    # dependency vulnerability scan (n
                                                # first, which is slow and can take a long time
                                                # without an NVD API key)
 ```
+
 See [Testing approach](05-testing-approach.md) for what each of these actually checks.

@@ -57,25 +57,26 @@ see [Testing approach](05-testing-approach.md#limitations-and-trade-offs).
 Not originally planned as "scenarios," but worth recording the same way — all three were only
 found by building, running, and load-testing the app for real, not by compiling or unit testing:
 
-- **Spring Boot 4 moved Flyway autoconfiguration into its own module** (`spring-boot-flyway`) -
-  having `flyway-core` and `flyway-database-postgresql` on the classpath was not sufficient; the
-  app booted but Hibernate tried to validate against a schema Flyway had never touched, and failed
-  with "missing table [short_urls]". Fixed by adding `spring-boot-flyway` as an explicit
-  dependency.
-- **`RedirectService`/`UrlService` failed to boot** — both have a public constructor plus a
+- **Spring Boot 4 moved Flyway autoconfiguration into its own module** (`spring-boot-flyway`) —
+  having `flyway-core` and `flyway-database-postgresql` on the classpath was not sufficient. The
+  app booted, then Hibernate tried to validate against a schema Flyway had never touched, and
+  failed with "missing table [short_urls]". Fixed by adding `spring-boot-flyway` explicitly.
+
+- **`RedirectService`/`UrlService` failed to boot.** Both have a public constructor plus a
   package-private one used only by tests, and neither was marked `@Autowired`. Spring Framework 7
-  won't pick a constructor automatically when there's more than one candidate; it fell back to
-  looking for a no-arg constructor, found none, and threw `NoSuchMethodException`. Fixed by adding
-  `@Autowired` to the intended constructor in both classes — and the same pattern was caught again
-  in `SqidsShortCodeGenerator` before it shipped, by deliberately checking for it this time.
+  won't pick a constructor automatically when there's more than one candidate — it fell back to a
+  no-arg constructor that didn't exist and threw `NoSuchMethodException`. Fixed with `@Autowired`
+  on the intended constructor in both classes, and the same pattern was caught again in
+  `SqidsShortCodeGenerator` before it shipped.
+
 - **Concurrent redirects exhausted the connection pool.** `./scripts/load-test.sh 20 200` found
-  23/200 concurrent redirects failing with `500` after ~30s each — a real HikariCP connection
-  timeout, not a flaky test. `RedirectService.resolve()`'s `@Transactional(readOnly = true)` held
-  one connection for the whole method while the `REQUIRES_NEW` click-count write needed a second
-  from the same pool, so every redirect briefly needed 2 connections at once and the default pool
-  of 10 saturated at 5 truly concurrent redirects. Fixed by removing the outer `@Transactional`
-  from `resolve()` — it wasn't load-bearing there, since the repository read and the write each
-  already had their own transaction. Re-ran the same load test after the fix: 0 failures at 20
-  concurrent, still 0 at 40. Full detail: [Testing approach](05-testing-approach.md#load-testing).
+  23/200 concurrent redirects failing with `500` after ~30s each — a real HikariCP timeout, not a
+  flaky test. `RedirectService.resolve()`'s `@Transactional(readOnly = true)` held one connection
+  for the whole method while the `REQUIRES_NEW` click-count write needed a second from the same
+  pool, so every redirect briefly needed 2 connections and the default pool of 10 saturated at 5
+  truly concurrent redirects. Fixed by removing the outer `@Transactional` — it wasn't
+  load-bearing, since the read and the write each already had their own transaction. Re-ran the
+  same load test after the fix: 0 failures at 20 concurrent, still 0 at 40. Full detail:
+  [Testing approach](05-testing-approach.md#load-testing).
 
 See [Working prototype](01-working-prototype.md) for the full validation trail these came from.

@@ -33,20 +33,26 @@ This went back and forth more than once, each time on the user's explicit direct
 1. Built out a full Redis caching layer (`ShortUrlLookupCache`, cache-aside on redirects) plus
    `docker-compose.yml` with both Postgres and Redis, on request ("add those" to close the gaps
    found in the initial review).
+
 2. User then asked to drop Docker entirely and use their already-running local Postgres, **and**
    to remove Redis from the codebase rather than also run it locally — the caching layer was
    deleted, `RedirectService` reverted to reading Postgres directly, `spring-boot-starter-data-redis`
    dropped from `pom.xml`.
+
 3. Discovered the user's local Postgres was a full EnterpriseDB install on port 5432 already
    serving other databases (`pgAdmin` open, `visitor_db` present) — didn't touch it, asked how the
    app should connect instead.
+
 4. User then asked for Docker again ("no overhead, can run by commands") — moved to a plain
    `docker run` command rather than a committed `docker-compose.yml`, since the user had no Docker
    installed at that point.
+
 5. Installed Docker Desktop via Homebrew (the final `sudo` symlink step needed an interactive
    password prompt the agent can't supply — the user ran that part themselves).
+
 6. User asked for `docker-compose.yml` back, specifically for Postgres, as part of the project
    skeleton commit.
+
 7. Credentials: first pass hardcoded `POSTGRES_USER`/`POSTGRES_PASSWORD` directly in
    `docker-compose.yml`; user asked for different, non-matching values, then asked for them to come
    from environment variables instead of being hardcoded at all. Landed on a git-ignored `.env` at
@@ -97,6 +103,7 @@ README) looked complete and all unit tests passed, the user explicitly asked for
    enough. The app booted, Hibernate tried to validate against a schema Flyway had never touched,
    and failed with "missing table [short_urls]." Found by actually starting the app and reading the
    startup log, not by any test.
+
 2. **`RedirectService`/`UrlService` wouldn't boot.** Both had a public constructor plus a
    package-private one used only by tests, and neither was marked `@Autowired`. Spring Framework 7
    doesn't auto-pick a constructor when there's more than one candidate; it fell back to a no-arg
@@ -183,6 +190,26 @@ Recorded here as things the agent chose, not things the assignment specified: lo
 is the only target (no CI config, no secrets manager beyond a git-ignored `.env`), the reviewer is
 assumed to have Docker available (both running the app and the integration test depend on it), and
 several capabilities were deliberately deferred rather than built — per-day/referrer analytics,
-auth/rate-limiting, a deactivate/delete API, and the block-allocation optimization for short-code
-generation — each with the reasoning for deferring it written down in `README.md` rather than
-silently left out.
+auth/rate-limiting, and the block-allocation optimization for short-code generation — each with the
+reasoning for deferring it written down in `README.md` rather than silently left out.
+
+## Comparing against another candidate's implementation
+
+The user shared a different engineer's implementation of the same assignment. Pulled it in full
+(README, file tree, `pom.xml`, `docs/TESTING.md`), and gave an honest comparison rather than
+copying it wholesale.
+
+Genuine gaps worth considering: SSRF/loopback URL validation, a deactivate endpoint. Differences
+that aren't deficiencies: their async click-tracking can silently lose clicks on failure (their
+own test admits it), unlike this project's synchronous atomic update; their test suite has zero
+tests touching a real database, unlike this project's Testcontainers integration test.
+
+## Deactivate: built. Auth: built, then reverted
+
+Deactivate (`DELETE /api/v1/urls/{shortCode}`) was built and kept - unauthenticated, like every
+other endpoint, which is a real open gap: anyone who knows a code can deactivate it.
+
+SSRF validation was declined ("this is not required") in favor of auth instead. HTTP Basic auth
+was then built for real - a `SecurityConfig`, credentials via `.env`, everything gated except
+`GET /{shortCode}` - and verified working end to end, before being explicitly reverted at the
+user's direction. Rate limiting (`bucket4j`) was scoped alongside it but never built.

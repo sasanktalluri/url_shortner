@@ -1,0 +1,344 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "URL Shortener API",
+        "description": "Create/redirect/stats endpoints for the URL shortener.",
+        "version": "v1"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080",
+            "description": "Generated server url"
+        }
+    ],
+    "paths": {
+        "/api/v1/urls": {
+            "post": {
+                "tags": [
+                    "url-controller"
+                ],
+                "summary": "Create a short URL",
+                "description": "Generates a short code for the given URL, or claims a caller-supplied custom alias.",
+                "operationId": "create",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateUrlRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Short URL created",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreateUrlResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Malformed request body (e.g. missing url, or expiresAt not in the future)",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Custom alias already taken",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "URL is not a valid http/https URL",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/{shortCode}": {
+            "get": {
+                "tags": [
+                    "redirect-controller"
+                ],
+                "summary": "Redirect to the original URL for a short code",
+                "operationId": "redirect",
+                "parameters": [
+                    {
+                        "name": "shortCode",
+                        "in": "path",
+                        "description": "The short code to resolve.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "UdBdLWZ"
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirects to the original URL (see the Location response header)"
+                    },
+                    "404": {
+                        "description": "No URL exists for this short code, or it has been deactivated",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "URL exists but has expired",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/urls/{shortCode}/stats": {
+            "get": {
+                "tags": [
+                    "url-controller"
+                ],
+                "summary": "Get click analytics for a short code",
+                "description": "Returns metadata plus click_count/last_accessed_at, whether or not the code is currently active.",
+                "operationId": "stats",
+                "parameters": [
+                    {
+                        "name": "shortCode",
+                        "in": "path",
+                        "description": "The short code to look up.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "UdBdLWZ"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stats returned",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UrlStatsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No URL exists for this short code",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/urls/{shortCode}": {
+            "delete": {
+                "tags": [
+                    "url-controller"
+                ],
+                "summary": "Deactivate a short code",
+                "description": "Redirects to a deactivated code return 404. Idempotent: deactivating an already-inactive code still returns 204.",
+                "operationId": "deactivate",
+                "parameters": [
+                    {
+                        "name": "shortCode",
+                        "in": "path",
+                        "description": "The short code to deactivate.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "UdBdLWZ"
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deactivated"
+                    },
+                    "404": {
+                        "description": "No URL exists for this short code",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetail"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "CreateUrlRequest": {
+                "type": "object",
+                "description": "Request body for creating a short URL.",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to shorten. Must use the http or https scheme.",
+                        "example": "https://example.com/some/very/long/path",
+                        "maxLength": 2048,
+                        "minLength": 0
+                    },
+                    "customAlias": {
+                        "type": "string",
+                        "description": "Optional caller-chosen short code instead of a generated one. 3-32 characters: letters, digits, underscore, or hyphen. Returns 409 if already taken.",
+                        "example": "summer-sale",
+                        "pattern": "^[A-Za-z0-9_-]{3,32}$"
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Optional expiry timestamp (ISO-8601, UTC). Must be in the future at creation time. Once passed, redirecting returns 410 Gone.",
+                        "example": "2026-12-31T23:59:59Z"
+                    }
+                },
+                "required": [
+                    "url"
+                ]
+            },
+            "ProblemDetail": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "detail": {
+                        "type": "string"
+                    },
+                    "instance": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "properties": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "CreateUrlResponse": {
+                "type": "object",
+                "description": "The created short URL and its metadata.",
+                "properties": {
+                    "shortCode": {
+                        "type": "string",
+                        "description": "The short code assigned to this URL.",
+                        "example": "UdBdLWZ"
+                    },
+                    "shortUrl": {
+                        "type": "string",
+                        "description": "The full short URL, ready to share.",
+                        "example": "http://localhost:8080/UdBdLWZ"
+                    },
+                    "originalUrl": {
+                        "type": "string",
+                        "description": "The original URL that was shortened.",
+                        "example": "https://example.com/some/very/long/path"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this short URL was created (UTC).",
+                        "example": "2026-09-01T18:33:41.430052Z"
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this short URL expires, or null if it never expires.",
+                        "example": "2026-12-31T23:59:59Z"
+                    }
+                }
+            },
+            "UrlStatsResponse": {
+                "type": "object",
+                "description": "Click analytics and metadata for a short URL.",
+                "properties": {
+                    "shortCode": {
+                        "type": "string",
+                        "description": "The short code.",
+                        "example": "UdBdLWZ"
+                    },
+                    "originalUrl": {
+                        "type": "string",
+                        "description": "The original URL this short code redirects to.",
+                        "example": "https://example.com/some/very/long/path"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this short URL was created (UTC).",
+                        "example": "2026-09-01T18:33:41.430052Z"
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this short URL expires, or null if it never expires.",
+                        "example": "2026-12-31T23:59:59Z"
+                    },
+                    "active": {
+                        "type": "boolean",
+                        "description": "false if the URL has been deactivated via DELETE.",
+                        "example": true
+                    },
+                    "clickCount": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Total number of times this short URL has been redirected.",
+                        "example": 42
+                    },
+                    "lastAccessedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When this short URL was last redirected, or null if never.",
+                        "example": "2026-09-01T19:10:22.512Z"
+                    }
+                }
+            }
+        }
+    }
+}
